@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; object-src 'none'">
+  <title>Phasebind</title>
+  <link rel="preload" href="assets/fonts/MonaSans-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/panel.css">
+</head>
+<body>
+  <div id="busyBar" hidden></div>
+
+  <div id="mainView" class="view">
+    <header class="bar">
+      <span id="lamp" class="lamp"><span class="dot"></span>Live</span>
+      <span id="conn" class="conn"></span>
+      <button id="openSettings" class="icon-btn" data-i18n-title="settings" data-icon="settings"></button>
+    </header>
+
+    <div class="actions">
+      <button id="sendBtn" class="action" data-i18n-title="send">
+        <span data-icon="layers"></span><span data-icon="arrow_upward"></span>
+      </button>
+      <button id="getBtn" class="action primary" data-i18n-title="get">
+        <span data-icon="arrow_downward"></span>
+      </button>
+    </div>
+
+    <div id="status" class="status" role="status"></div>
+  </div>
+
+  <div id="settingsView" class="view" hidden>
+    <header class="bar">
+      <span class="bar-title" data-i18n="settings"></span>
+      <button id="closeSettings" class="icon-btn" data-i18n-title="close" data-icon="close"></button>
+    </header>
+
+    <div class="settings">
+      <section>
+        <h2 data-i18n="saveTo"></h2>
+        <label class="check"><input type="checkbox" id="useSaveDir" checked><span data-i18n="fixedDir"></span></label>
+        <div class="path-row">
+          <input id="saveDir" spellcheck="false" value="./Phasebind" data-i18n-title="saveTo">
+          <button id="pickSaveDir" class="icon-btn" data-i18n-title="chooseFolder" data-icon="folder"></button>
+        </div>
+        <p class="hint" id="saveDirHint"></p>
+      </section>
+
+      <section>
+        <h2>Ae → Live</h2>
+        <label class="field"><span data-i18n="exportMode"></span>
+          <select id="exportMode">
+            <option value="auto" data-i18n="exportAuto"></option>
+            <option value="render" data-i18n="exportRender"></option>
+          </select>
+        </label>
+      </section>
+
+      <section>
+        <h2>Live → Ae</h2>
+        <label class="check"><input type="checkbox" id="muteSent" checked><span data-i18n="muteSent"></span></label>
+      </section>
+
+      <section>
+        <h2 data-i18n="tail"></h2>
+        <div class="grid">
+          <label class="field"><span data-i18n="silenceDb"></span><input type="number" id="tailThresholdDb" value="-60" step="1"></label>
+          <label class="field"><span data-i18n="holdMs"></span><input type="number" id="tailHoldMs" value="1500" step="100"></label>
+          <label class="field"><span data-i18n="maxSec"></span><input type="number" id="maxTailSec" value="15" step="1"></label>
+          <label class="field"><span data-i18n="trimDb"></span><input type="number" id="trimThresholdDb" value="-70" step="1"></label>
+          <label class="field"><span data-i18n="offsetMs"></span><input type="number" id="latencyOffsetMs" value="0" step="1"></label>
+        </div>
+      </section>
+
+      <section>
+        <label class="field"><span data-i18n="language"></span>
+          <select id="lang">
+            <option value="ja">日本語</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+      </section>
+
+      <footer class="about">
+        <div class="about-name"><span>Phasebind</span><span id="version"></span></div>
+        <div>© 2026 Sqkurq · GPL-3.0</div>
+        <div class="hint">Mona Sans / Noto Sans JP — SIL OFL 1.1<br>Material Symbols — Apache 2.0</div>
+      </footer>
+    </div>
+  </div>
+
+  <script src="js/i18n.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

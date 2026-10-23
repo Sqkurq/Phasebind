@@ -1,0 +1,12 @@
+{
+  "name": "phasebind",
+  "version": "0.8.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "author": "Sqkurq",
+  "description": "After Effects <-> Ableton Live audio round-trip",
+  "scripts": {
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-zxp.ps1",
+    "build:nots": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-zxp.ps1 -NoTimestamp"
+  }
+}

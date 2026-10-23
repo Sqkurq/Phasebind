@@ -1,0 +1,131 @@
+/* Phasebind panel. Narrow dockable column.
+   pink #f62660 / black #060606 / white #eeeeee, Mona Sans + Noto Sans JP, Material Symbols. */
+@font-face {
+  font-family: "Mona Sans"; src: url("../assets/fonts/MonaSans-Variable.woff2") format("woff2");
+  font-style: normal; font-weight: 200 900; font-display: swap;
+  unicode-range: U+0000-024F, U+1E00-1EFF;
+}
+@font-face {
+  font-family: "Noto Sans JP"; src: url("../assets/fonts/NotoSansJP-Variable.ttf") format("truetype");
+  font-style: normal; font-weight: 100 900; font-display: swap;
+}
+@font-face {
+  font-family: "Material Symbols Outlined"; src: url("../assets/fonts/MaterialSymbolsOutlined-Subset.woff2") format("woff2");
+  font-style: normal; font-weight: 400; font-display: block;
+}
+:root {
+  color-scheme: dark;
+  --bg: #060606; --text: #eeeeee; --accent: #f62660;
+  --line: rgba(238,238,238,.17); --line-strong: rgba(238,238,238,.35);
+  --muted: rgba(238,238,238,.58); --hover: rgba(238,238,238,.065);
+  --ok: #eeeeee;
+  --font: "Mona Sans", "Noto Sans JP", sans-serif;
+  font: 11px/1.4 var(--font); font-optical-sizing: auto;
+  font-variant-numeric: tabular-nums; font-synthesis: none;
+}
+
+*, *::before, *::after { box-sizing: border-box; border-radius: 0; }
+html, body { height: 100%; }
+body {
+  margin: 0; min-width: 0; overflow: hidden;
+  background: var(--bg); color: var(--text);
+  user-select: none; -webkit-user-select: none;
+}
+[hidden] { display: none !important; }
+
+.material-symbol {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  font-family: "Material Symbols Outlined"; font-weight: 400; font-style: normal; font-size: 16px;
+  line-height: 1; letter-spacing: normal; text-transform: none; white-space: nowrap; direction: ltr;
+  font-feature-settings: "liga"; -webkit-font-smoothing: antialiased; pointer-events: none;
+}
+[data-icon] { display: inline-flex; align-items: center; justify-content: center; }
+
+button, input, select { font: inherit; color: inherit; }
+button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0;
+  min-height: 22px; padding: 0 4px; background: transparent;
+  border: 1px solid var(--line); cursor: pointer;
+}
+button:hover { background: var(--hover); border-color: var(--line-strong); }
+button:active { background: rgba(238,238,238,.12); }
+button:disabled { opacity: .32; cursor: default; }
+button:disabled:hover { background: transparent; border-color: var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+input, select {
+  width: 100%; min-width: 0; height: 22px; padding: 2px 4px;
+  background: var(--bg); border: 1px solid var(--line); caret-color: var(--accent);
+  user-select: text; -webkit-user-select: text;
+}
+input:hover, select:hover { border-color: var(--line-strong); }
+input:focus, select:focus { border-color: var(--accent); outline: 0; }
+select option { background: var(--bg); color: var(--text); }
+::selection { background: var(--accent); color: var(--text); }
+input[type=checkbox] {
+  appearance: none; -webkit-appearance: none; display: inline-grid; place-content: center; flex-shrink: 0;
+  width: 12px; height: 12px; margin: 0; padding: 0; border: 1px solid var(--line-strong); cursor: pointer;
+}
+input[type=checkbox]:checked { background: var(--accent); border-color: var(--accent); }
+input[type=checkbox]:checked::after { content: "check"; width: 10px; height: 10px; font: 12px/10px "Material Symbols Outlined"; font-feature-settings: "liga"; }
+input:disabled { opacity: .4; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: rgba(238,238,238,.25); }
+::-webkit-scrollbar-thumb:hover { background: rgba(238,238,238,.45); }
+
+/* ---------------------------------------------------------------- layout */
+
+.view { display: flex; flex-direction: column; height: 100%; }
+
+.bar { flex-shrink: 0; display: flex; align-items: center; gap: 4px; height: 24px; padding: 0 1px 0 5px; border-bottom: 1px solid var(--line); }
+.bar-title { flex: 1; color: var(--muted); font-size: 10px; }
+.icon-btn { width: 22px; min-width: 22px; padding: 0; border-color: transparent; color: var(--muted); }
+.icon-btn:hover { border-color: transparent; color: var(--text); }
+
+/* Live connection lamp: hollow = offline, white = ready, pink = device not on Master. */
+.lamp { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 10px; }
+.dot { flex-shrink: 0; width: 7px; height: 7px; border: 1px solid var(--line-strong); border-radius: 50%; }
+.lamp.on { color: var(--text); }
+.lamp.on .dot { background: var(--text); border-color: var(--text); }
+.lamp.warn { color: var(--accent); }
+.lamp.warn .dot { background: var(--accent); border-color: var(--accent); }
+.conn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; color: var(--muted); font-size: 10px; }
+
+/* The only loud element: the capture button. */
+.actions { flex-shrink: 0; display: grid; gap: 3px; padding: 4px; }
+.action { width: 100%; height: 30px; }
+.action .material-symbol { font-size: 18px; }
+.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.primary:hover { background: var(--text); border-color: var(--text); color: var(--bg); }
+.primary:disabled, .primary:disabled:hover { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+
+.status {
+  flex: 1; min-height: 0; overflow: hidden; padding: 0 5px 4px;
+  color: var(--muted); font-size: 10px; line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; word-break: break-all;
+}
+.status.err { color: var(--accent); }
+
+/* Capture in progress: a single sweeping hairline. */
+#busyBar { position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 5; overflow: hidden; }
+#busyBar::after { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; background: var(--accent); animation: sweep 1.1s linear infinite; }
+@keyframes sweep { from { left: -40%; } to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { #busyBar::after { animation: none; left: 0; width: 100%; } }
+
+/* ---------------------------------------------------------------- settings */
+
+.settings { flex: 1; min-height: 0; overflow: auto; padding: 0 5px 6px; }
+.settings section { padding: 5px 0 6px; border-bottom: 1px solid var(--line); }
+.settings h2 { margin: 0 0 4px; color: var(--muted); font-size: 10px; font-weight: 500; }
+.field { display: block; margin-bottom: 3px; }
+.field > span { display: block; margin-bottom: 1px; color: rgba(238,238,238,.75); font-size: 9px; }
+.check { display: flex; align-items: center; gap: 5px; min-height: 18px; margin: 2px 0; font-size: 10px; cursor: pointer; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 0 4px; }
+.path-row { display: flex; gap: 2px; }
+.path-row .icon-btn { border-color: var(--line); }
+.hint { margin: 3px 0 0; color: var(--muted); font-size: 9px; line-height: 1.35; }
+.about { padding-top: 6px; font-size: 10px; color: var(--muted); }
+.about-name { display: flex; justify-content: space-between; color: var(--text); }
+.about .hint { margin-top: 4px; }
