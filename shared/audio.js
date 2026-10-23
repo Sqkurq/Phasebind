@@ -337,16 +337,21 @@ function finalizeCapture(rawPath, outPath, meta) {
   }
   t0 += Math.round(((meta.latencyOffsetMs || 0) / 1000) * sr);
 
-  if (startBeat > meta.rangeStartBeat + 1e-3) {
+  const rangeStart = t0 + Math.round((meta.rangeStartBeat - startBeat) * samplesPerBeat);
+  const rangeEnd = t0 + Math.round((meta.rangeEndBeat - startBeat) * samplesPerBeat);
+
+  // The marker only changes at the first audio buffer boundary after the
+  // transport starts, so t0 can be up to one buffer after the real start. When
+  // the range begins at beat 0 there is no pre-roll and the range start lands
+  // just before t0; that is fine. Only a start well after the range is an error.
+  const BUFFER_TOLERANCE = 4096; // largest common audio buffer size
+  if (rangeStart < t0 - BUFFER_TOLERANCE) {
     const err = new Error(
       "playback started at beat " + startBeat.toFixed(3) + ", after the range start " + meta.rangeStartBeat.toFixed(3)
     );
     err.code = "lateStart";
     throw err;
   }
-
-  const rangeStart = t0 + Math.round((meta.rangeStartBeat - startBeat) * samplesPerBeat);
-  const rangeEnd = t0 + Math.round((meta.rangeEndBeat - startBeat) * samplesPerBeat);
 
   // Tail: keep everything after rangeEnd until the signal decays below the threshold.
   const threshold = dbToLinear(meta.trimThresholdDb != null ? meta.trimThresholdDb : -70);

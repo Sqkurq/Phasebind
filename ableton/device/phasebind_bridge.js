@@ -124,6 +124,8 @@ maxAPI.addHandler("fromjs", (encoded) => {
       reply = { id: msg.id, ok: true, result: finalize(msg.result, req ? req.options : {}) };
     } catch (e) {
       reply = { id: msg.id, ok: false, code: e.code || "postFailed", error: e.message };
+      // The raw recording is kept on failure; log where it is for diagnosis.
+      maxAPI.post(`Phasebind error: ${reply.code}: ${e.message} (raw: ${msg.result.rawPath})`, maxAPI.POST_LEVELS.ERROR);
     }
     if (req) send(req.socket, reply);
     else broadcast(Object.assign({ event: "captured" }, reply)); // triggered from the device button

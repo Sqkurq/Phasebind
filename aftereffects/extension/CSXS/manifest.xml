@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.phasebind.ae" ExtensionBundleVersion="0.8.0" ExtensionBundleName="Phasebind"
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.phasebind.ae" ExtensionBundleVersion="0.8.1" ExtensionBundleName="Phasebind"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.phasebind.ae.panel" Version="0.8.0" />
+    <Extension Id="com.phasebind.ae.panel" Version="0.8.1" />
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>
