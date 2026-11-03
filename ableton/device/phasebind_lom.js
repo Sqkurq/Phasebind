@@ -17,7 +17,7 @@ autowatch = 1;
 inlets = 2;
 outlets = 4;
 
-var VERSION = "0.9.3";
+var VERSION = "0.9.4";
 var MIX_LINK_ID = "master";
 
 var song = null;
@@ -133,7 +133,7 @@ function startCapture(requestId, opts) {
     tailThresholdDb: opts.tailThresholdDb != null ? opts.tailThresholdDb : -60,
     tailHoldMs: opts.tailHoldMs != null ? opts.tailHoldMs : 1500,
     maxTailSec: opts.maxTailSec != null ? opts.maxTailSec : 15,
-    rawPath: opts.rawPath || (baseDir + "/raw_" + nowMs() + ".wav")
+    rawPath: opts.rawPath || (baseDir + "/pl_raw_" + nowMs() + ".wav")
   };
 
   var state = {
@@ -371,19 +371,25 @@ function importVideo(json) {
 
 // ------------------------------------------------------------------ markers (Ae <-> Live)
 
-// Ae comp markers become named silent clips on a "PB Markers" track. Locators
-// can't be used: set_or_delete_cue rounds the position to the bar and the LOM
-// cannot move a locator. Live -> Ae reads both locators and those clips.
+// Ae comp markers become named empty MIDI clips on a "PB Markers" MIDI track.
+// Locators can't be used: set_or_delete_cue rounds the position to the bar and
+// the LOM cannot move a locator. Live -> Ae reads both locators and the clips
+// of every "PB Markers" track (0.9.3 made it an audio track with silent clips).
 var MARKER_TRACK = "PB Markers";
-var POS_EPS = 1e-3; // beats; two clips/locators closer than this share a position
+var POS_EPS = 1e-3;   // beats; two clips/locators closer than this share a position
+var POINT_SEC = 0.5;  // clip length for markers without a duration (read back as a point)
+var MIN_CLIP_SEC = 0.05;
 
-function findTrack(name) {
-  var tracks = idList(song, "tracks");
+// midi: true / false to require that kind of track, undefined for any.
+function findTracks(name, midi) {
+  var tracks = idList(song, "tracks"), out = [];
   for (var i = 0; i < tracks.length; i++) {
     var t = byId(tracks[i]);
-    if (str(t, "name") === name) return t;
+    if (str(t, "name") !== name) continue;
+    if (midi !== undefined && (num(t, "has_midi_input") === 1) !== midi) continue;
+    out.push(t);
   }
-  return null;
+  return out;
 }
 
 function clipAt(track, beats) {
@@ -395,36 +401,40 @@ function clipAt(track, beats) {
   return null;
 }
 
-// Each marker carries the path of a silent WAV as long as the clip should be
-// (written by the bridge). A clip already at the same position is renamed;
-// nothing is deleted.
+// The clip length is the marker duration (POINT_SEC without one), cut short
+// so no clip runs into the next marker. A clip already at the same position
+// is renamed; nothing is deleted.
 function importMarkers(json) {
   var req = decode(json);
   try {
     if (!song) init();
     var tempo = num(song, "tempo");
-    var track = findTrack(MARKER_TRACK);
+    var track = findTracks(MARKER_TRACK, true)[0];
     if (!track) {
-      song.call("create_audio_track", -1);
+      song.call("create_midi_track", -1);
       var tracks = idList(song, "tracks");
       track = byId(tracks[tracks.length - 1]);
       track.set("name", MARKER_TRACK);
     }
+    var markers = req.markers.slice().sort(function (a, b) { return a.timeSec - b.timeSec; });
     var created = 0, renamed = 0, unchanged = 0;
-    for (var i = 0; i < req.markers.length; i++) {
-      var m = req.markers[i];
+    for (var i = 0; i < markers.length; i++) {
+      var m = markers[i];
+      var name = m.name || "Marker";
       var beats = m.timeSec * tempo / 60;
       var clip = clipAt(track, beats);
       if (clip) {
-        if (str(clip, "name") !== m.name) { clip.set("name", m.name); renamed++; }
+        if (str(clip, "name") !== name) { clip.set("name", name); renamed++; }
         else unchanged++;
         continue;
       }
-      track.call("create_audio_clip", m.path, beats);
+      var sec = m.durationSec > 0 ? m.durationSec : POINT_SEC;
+      if (i + 1 < markers.length) sec = Math.min(sec, markers[i + 1].timeSec - m.timeSec);
+      sec = Math.max(sec, MIN_CLIP_SEC);
+      track.call("create_midi_clip", beats, sec * tempo / 60);
       clip = clipAt(track, beats);
       if (!clip) throw fail("markerFailed", "no clip at beat " + beats);
-      clip.set("warping", 0);
-      clip.set("name", m.name);
+      clip.set("name", name);
       created++;
     }
     status("Markers " + (created + renamed));
@@ -446,12 +456,14 @@ function cues(json) {
       var c = byId(ids[i]);
       out.push({ name: str(c, "name"), timeSec: num(c, "time") * toSec, durationSec: 0 });
     }
-    var track = findTrack(MARKER_TRACK);
-    var clips = track ? idList(track, "arrangement_clips") : [];
-    for (var j = 0; j < clips.length; j++) {
-      var k = byId(clips[j]);
-      var st = num(k, "start_time");
-      out.push({ name: str(k, "name"), timeSec: st * toSec, durationSec: (num(k, "end_time") - st) * toSec, clip: true });
+    var tracks = findTracks(MARKER_TRACK);
+    for (var t = 0; t < tracks.length; t++) {
+      var clips = idList(tracks[t], "arrangement_clips");
+      for (var j = 0; j < clips.length; j++) {
+        var k = byId(clips[j]);
+        var st = num(k, "start_time");
+        out.push({ name: str(k, "name"), timeSec: st * toSec, durationSec: (num(k, "end_time") - st) * toSec, clip: true });
+      }
     }
     out.sort(function (a, b) { return a.timeSec - b.timeSec; });
     toNode({ id: req.id, ok: true, result: { cues: out, tempo: tempo } });

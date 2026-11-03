@@ -85,7 +85,7 @@ Live のデバイスの **Send to Ae** からも同じ収録ができます。
 
 ### マーカー（下段の 2 つのボタン）
 
-- **マーカー＋上矢印**：アクティブなコンポのコンポマーカーを、Live の「PB Markers」トラックに無音のクリップとして置きます。クリップ名はマーカーのコメントです。デュレーションのあるマーカーはその長さ、ないものは 0.5 秒のクリップになります
+- **マーカー＋上矢印**：アクティブなコンポのコンポマーカーを、Live の「PB Markers」MIDI トラックに空の MIDI クリップとして置きます。クリップ名はマーカーのコメントです。デュレーションのあるマーカーはその長さ、ないものは 0.5 秒のクリップになります
 - **マーカー＋下矢印**：Live のロケーターと「PB Markers」のクリップを、コンポマーカーとして置きます（フレーム単位に丸めます）
 
 どちらも、同じ位置にすでにあるものは名前だけ合わせます。削除はしません。
@@ -96,7 +96,7 @@ Live のロケーターとして置かないのは、Live の API でロケー�
 
 | 項目 | 内容 |
 |---|---|
-| 保存先 | 既定は `./Phasebind`（.aep と同じフォルダ）。「固定」をオフにすると毎回選びます。未保存のプロジェクトでは最初に基準フォルダを聞きます |
+| 保存先 | 既定は `./Phasebind`（.aep と同じフォルダ）。「固定」をオフにすると毎回選びます。未保存のプロジェクトでは最初に基準フォルダを聞きます。Live とやり取りするファイル（書き出した音声・映像、収録したミックス）はすべてここに置かれ、ほかの場所には残りません（Live デバイスの **Send to Ae** で収録したときだけ、OS の一時フォルダを経由してここへ移します） |
 | 書き出し | Ae → Live の書き出し方法（WAV は切り出し / 常にレンダー） |
 | 送ったレイヤーをミュート | Live から取り込んだとき、Live に送ったレイヤーの音をオフにして二重に鳴らないようにします |
 | テール | 余韻の判定（無音 dB・保持 ms・最大 秒）、末尾の無音カット（トリム dB）、位置の微調整（補正 ms） |
@@ -205,10 +205,10 @@ Ae → Live renders work without a preset (if WAV can't be set, Phasebind render
 - **Video + up arrow** (right of the waveform button): render the comp's work area as H.264 (.mp4) and place it in Live on a new, muted "PB Video" track at the work area start. Live shows it in its video window; unmute the track to hear the comp mix
 - **Pink down arrow**: capture the Live mix in real time and bring it into Ae. Loop on: loop region. Loop off: whole arrangement. Recording continues until the tail decays
 - **Send to Ae** on the Live device does the same capture from Live
-- **Marker + up arrow**: place the active comp's markers in Live as named silent clips on a "PB Markers" track (marker duration, or 0.5 s for markers without one). Live's API rounds new locators to the bar and can't move them, so clips are used instead
+- **Marker + up arrow**: place the active comp's markers in Live as named empty MIDI clips on a "PB Markers" MIDI track (marker duration, or 0.5 s for markers without one). Live's API rounds new locators to the bar and can't move them, so clips are used instead
 - **Marker + down arrow**: place Live's locators and "PB Markers" clips in the comp as markers (snapped to frames). In both directions an existing marker at the same position is only renamed; nothing is deleted
 
-Settings (gear icon): save folder (default `./Phasebind`, next to the .aep; turn off **Fixed** to choose each time), export mode, mute sent layers, tail detection, language.
+Settings (gear icon): save folder (default `./Phasebind`, next to the .aep; turn off **Fixed** to choose each time; every file exchanged with Live is kept there and nowhere else, except that captures started from the device's **Send to Ae** pass through the system temp folder), export mode, mute sent layers, tail detection, language.
 
 ### Notes
 

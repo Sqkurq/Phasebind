@@ -7,7 +7,7 @@ var PL_TAG = "Phasebind:";
 var PL_FOLDER = "Phasebind";
 var PL_WAV_TEMPLATE = "Phasebind WAV";
 var PL_VIDEO_TEMPLATE = "Phasebind H.264";
-var PL_POINT_SEC = 0.5; // clip length the Live device uses for markers without a duration
+var PL_POINT_SEC = 0.5; // clip length the Live device uses for markers without a duration (POINT_SEC)
 
 // ---------------------------------------------------------------- JSON (ExtendScript has none)
 

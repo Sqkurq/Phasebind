@@ -14,15 +14,15 @@ const path = require("path");
 const audio = require("./audio.js");
 
 const PORT = 47820;
-const BASE_DIR = path.join(os.homedir(), "Phasebind");
-const RAW_DIR = path.join(BASE_DIR, "raw");
-const FROM_LIVE_DIR = path.join(BASE_DIR, "from_live");
-const MARKER_DIR = path.join(BASE_DIR, "markers");
-
-for (const d of [BASE_DIR, RAW_DIR, FROM_LIVE_DIR, MARKER_DIR]) fs.mkdirSync(d, { recursive: true });
+// Every file goes to the Ae panel's save folder (options.outDir). Only captures
+// started from the device button, which has no such folder, use the system
+// temp folder; Ae moves the result into its save folder on import and the raw
+// recording is deleted.
+const TEMP_DIR = os.tmpdir();
 
 const clients = new Set();
 const pending = new Map(); // request id -> { socket, type, options }
+let deviceOptions = {};    // capture options for the device button, from setDefaults
 
 const toMaxPath = (p) => p.replace(/\\/g, "/");
 const encode = (obj) => encodeURIComponent(JSON.stringify(obj));
@@ -30,7 +30,7 @@ const sanitize = (s) => String(s).replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 60) 
 const shortId = () => Math.random().toString(36).slice(2, 10);
 
 // [js] may already be initialised before this script starts; tell it where to record.
-maxAPI.outlet("setdir", toMaxPath(RAW_DIR));
+maxAPI.outlet("setdir", toMaxPath(TEMP_DIR));
 
 function send(socket, obj) {
   if (socket && !socket.destroyed) socket.write(JSON.stringify(obj) + "\n");
@@ -88,15 +88,17 @@ function handleRequest(socket, req) {
       break;
     case "sendMarkers":
       pending.set(id, { socket, type: "sendMarkers" });
-      maxAPI.outlet("importMarkers", encode({ id, markers: markerClips(req.markers) }));
+      maxAPI.outlet("importMarkers", encode({ id, markers: req.markers }));
       break;
     case "getMarkers":
       pending.set(id, { socket, type: "getMarkers" });
       maxAPI.outlet("cues", encode({ id }));
       break;
     case "capture": {
+      const dir = (req.options && req.options.outDir) || TEMP_DIR;
+      fs.mkdirSync(dir, { recursive: true });
       const options = Object.assign({}, req.options, {
-        rawPath: toMaxPath(path.join(RAW_DIR, `raw_${Date.now()}.wav`)),
+        rawPath: toMaxPath(path.join(dir, `pl_raw_${Date.now()}.wav`)),
       });
       pending.set(id, { socket, type: "capture", options });
       maxAPI.outlet("captureRequest", encode({ id, options }));
@@ -104,38 +106,13 @@ function handleRequest(socket, req) {
     }
     case "setDefaults":
       // Options used when capture is triggered from the device button.
-      maxAPI.outlet("setdefaults", encode(req.options || {}));
+      deviceOptions = req.options || {};
+      maxAPI.outlet("setdefaults", encode(deviceOptions));
       send(socket, { id, ok: true });
       break;
     default:
       send(socket, { id, ok: false, code: "badRequest", error: "unknown request type: " + req.type });
   }
-}
-
-// ------------------------------------------------------------------ marker clips
-
-// Ae markers become silent clips in Live; the WAV length is the clip length.
-// Markers without a duration get POINT_SEC (read back as a point marker), and
-// no clip runs into the next marker, which Live would otherwise cut.
-const POINT_SEC = 0.5;
-const MIN_CLIP_SEC = 0.05;
-const SILENCE_RATE = 48000;
-
-function markerClips(markers) {
-  const sorted = (markers || []).slice().sort((a, b) => a.timeSec - b.timeSec);
-  return sorted.map((m, i) => {
-    let sec = m.durationSec > 0 ? m.durationSec : POINT_SEC;
-    if (i + 1 < sorted.length) sec = Math.min(sec, sorted[i + 1].timeSec - m.timeSec);
-    sec = Math.max(sec, MIN_CLIP_SEC);
-    return { timeSec: m.timeSec, name: m.name || "Marker", path: toMaxPath(silence(sec)) };
-  });
-}
-
-function silence(sec) {
-  const frames = Math.round(sec * SILENCE_RATE);
-  const file = path.join(MARKER_DIR, `silence_${frames}.wav`);
-  if (!fs.existsSync(file)) audio.writeWav(file, SILENCE_RATE, [new Float32Array(frames)], 24);
-  return file;
 }
 
 // ------------------------------------------------------------------ messages from [js]
@@ -150,7 +127,7 @@ maxAPI.addHandler("fromjs", (encoded) => {
   }
 
   if (msg.event === "jsReady") {
-    maxAPI.outlet("setdir", toMaxPath(RAW_DIR));
+    maxAPI.outlet("setdir", toMaxPath(TEMP_DIR));
     return;
   }
 
@@ -160,7 +137,7 @@ maxAPI.addHandler("fromjs", (encoded) => {
   if (msg.type === "captured" && msg.ok) {
     let reply;
     try {
-      reply = { id: msg.id, ok: true, result: finalize(msg.result, req ? req.options : {}) };
+      reply = { id: msg.id, ok: true, result: finalize(msg.result, req ? req.options : deviceOptions) };
     } catch (e) {
       reply = { id: msg.id, ok: false, code: e.code || "postFailed", error: e.message };
       // The raw recording is kept on failure; log where it is for diagnosis.
@@ -177,9 +154,9 @@ maxAPI.addHandler("fromjs", (encoded) => {
 
 function finalize(r, options) {
   const linkId = r.linkId || shortId();
-  // The Ae panel sends "<project folder>/Phasebind"; captures started from the
-  // device button fall back to the home folder and are moved by Ae on import.
-  const outDir = options.outDir || FROM_LIVE_DIR;
+  // The Ae panel sends its save folder; captures started from the device
+  // button land in the temp folder and are moved by Ae on import.
+  const outDir = options.outDir || TEMP_DIR;
   fs.mkdirSync(outDir, { recursive: true });
   const outPath = path.join(outDir, `pl_${linkId}_${sanitize(r.trackName)}_${Date.now()}.wav`);
   const rawPath = path.normalize(r.rawPath);
