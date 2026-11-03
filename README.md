@@ -48,22 +48,29 @@ After Effects と Ableton Live のあいだで音を往復させるツールで�
 
 一度 Master に挿した状態でセットを保存するか、デフォルトのセット（**設定 > File & Folder > Save Current Set as Default**）に入れておくと、毎回挿す手間が省けます。
 
-Ae パネル左上のランプが白く点けば接続できています。
+Ae パネル左上のランプが緑に点けば接続できています。Live のデバイス右上の「● Ae」も、接続中は緑になります。
 
 | ランプ | 状態 |
 |---|---|
 | ○ 中抜き | Live 未接続（デバイスが読み込まれていない） |
-| ● 白 | 接続中 |
+| ● 緑 | 接続中 |
 | ● ピンク | デバイスが Master 以外に挿さっている |
 
 ## 使い方
 
-### Ae → Live（レイヤー＋上矢印のボタン）
+### Ae → Live（波形＋上矢印のボタン）
 
 1. Ae で音声を含むレイヤーを選びます
 2. ボタンを押すと、WAV に書き出して Live に新しいトラックとして置きます
    - 元が WAV で伸縮・タイムリマップがなければ、そのまま切り出します（エフェクトは反映されません）
    - それ以外はレンダーします（エフェクト・レベルを反映）
+
+### 映像を Live へ（映像フレーム＋上矢印、波形ボタンの右）
+
+1. アクティブなコンポのワークエリアを H.264（.mp4）でレンダーします
+2. Live に「PB Video <コンポ名>」トラックを作り、ワークエリアの開始位置に置きます。映像は Live のビデオウィンドウに表示されます
+   - レイヤーの音を別に送ることが多いため、トラックはミュートした状態で置きます。コンポの音を聞きたいときはミュートを外してください
+   - 送るたびに新しいトラックが増えます
 
 ### Live → Ae（ピンクの下矢印ボタン）
 
@@ -75,6 +82,15 @@ Ae パネル左上のランプが白く点けば接続できています。
 Live のデバイスの **Send to Ae** からも同じ収録ができます。
 
 収録中は Live の再生位置・ループ・クリップのミュートを一時的に変更し、終わると元に戻します。
+
+### マーカー（下段の 2 つのボタン）
+
+- **マーカー＋上矢印**：アクティブなコンポのコンポマーカーを、Live の「PB Markers」トラックに無音のクリップとして置きます。クリップ名はマーカーのコメントです。デュレーションのあるマーカーはその長さ、ないものは 0.5 秒のクリップになります
+- **マーカー＋下矢印**：Live のロケーターと「PB Markers」のクリップを、コンポマーカーとして置きます（フレーム単位に丸めます）
+
+どちらも、同じ位置にすでにあるものは名前だけ合わせます。削除はしません。
+
+Live のロケーターとして置かないのは、Live の API でロケーターを作ると位置が小節の頭に丸められ、後から動かすこともできないためです。
 
 ## 設定（パネル右上の歯車）
 
@@ -110,7 +126,7 @@ Ae → Live のレンダーは、プリセットがなくても自動で行い�
 |---|---|
 | ランプが点かない | Live の Master に Phasebind デバイスがあるか確認。Max のウィンドウにエラーが出ていないか確認 |
 | 「音声を書き出せません」 | 「Phasebind WAV」プリセットを作る（上記）か、下の手順で「AIFF 48kHz」を追加し直す |
-| ランプは白いが Live にトラックが増えない | Max のウィンドウにエラーが出ていないか確認。デバイスのフォルダ内のファイルが揃っているか確認 |
+| ランプは緑だが Live にトラックが増えない | Max のウィンドウにエラーが出ていないか確認。デバイスのフォルダ内のファイルが揃っているか確認 |
 
 **「AIFF 48kHz」プリセットを手動で追加する**（Ae 付属のものを削除・改名した場合）
 
@@ -167,7 +183,7 @@ Without an installer, run Creative Cloud's bundled installer:
 
 Save it in your default set (**Settings > File & Folder > Save Current Set as Default**) to have it on Master every time.
 
-The lamp at the top left of the Ae panel turns white when connected (pink: device is not on Master).
+The lamp at the top left of the Ae panel turns green when connected (pink: device is not on Master). The "● Ae" label on the Live device also turns green while connected.
 
 ### "Phasebind WAV" preset (optional)
 
@@ -185,9 +201,12 @@ Ae → Live renders work without a preset (if WAV can't be set, Phasebind render
 
 ### Use
 
-- **Layers + up arrow**: export the selected audio layers and place them in Live
+- **Waveform + up arrow**: export the selected audio layers and place them in Live
+- **Video + up arrow** (right of the waveform button): render the comp's work area as H.264 (.mp4) and place it in Live on a new, muted "PB Video" track at the work area start. Live shows it in its video window; unmute the track to hear the comp mix
 - **Pink down arrow**: capture the Live mix in real time and bring it into Ae. Loop on: loop region. Loop off: whole arrangement. Recording continues until the tail decays
 - **Send to Ae** on the Live device does the same capture from Live
+- **Marker + up arrow**: place the active comp's markers in Live as named silent clips on a "PB Markers" track (marker duration, or 0.5 s for markers without one). Live's API rounds new locators to the bar and can't move them, so clips are used instead
+- **Marker + down arrow**: place Live's locators and "PB Markers" clips in the comp as markers (snapped to frames). In both directions an existing marker at the same position is only renamed; nothing is deleted
 
 Settings (gear icon): save folder (default `./Phasebind`, next to the .aep; turn off **Fixed** to choose each time), export mode, mute sent layers, tail detection, language.
 

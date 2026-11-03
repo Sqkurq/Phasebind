@@ -19,12 +19,25 @@
     </header>
 
     <div class="actions">
-      <button id="sendBtn" class="action" data-i18n-title="send">
-        <span data-icon="layers"></span><span data-icon="arrow_upward"></span>
-      </button>
+      <div class="pair-row">
+        <button id="sendBtn" class="action" data-i18n-title="send">
+          <svg class="glyph" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 7v4M5 4v10M8 6v6M11 2v14M14 5v8M17 8v2"/></svg><span data-icon="arrow_upward"></span>
+        </button>
+        <button id="sendVideoBtn" class="action" data-i18n-title="sendVideo">
+          <svg class="glyph" viewBox="0 0 18 18" aria-hidden="true"><rect x="1.5" y="3.5" width="15" height="11"/><path class="fill" d="M7 6.5v5l4.5-2.5z"/></svg><span data-icon="arrow_upward"></span>
+        </button>
+      </div>
       <button id="getBtn" class="action primary" data-i18n-title="get">
         <span data-icon="arrow_downward"></span>
       </button>
+      <div class="pair-row">
+        <button id="sendMarkersBtn" class="action small" data-i18n-title="sendMarkers">
+          <span class="marker-glyph" aria-hidden="true"></span><span data-icon="arrow_upward"></span>
+        </button>
+        <button id="getMarkersBtn" class="action small" data-i18n-title="getMarkers">
+          <span class="marker-glyph" aria-hidden="true"></span><span data-icon="arrow_downward"></span>
+        </button>
+      </div>
     </div>
 
     <div id="status" class="status" role="status"></div>

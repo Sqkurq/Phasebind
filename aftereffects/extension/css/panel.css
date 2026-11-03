@@ -18,7 +18,7 @@
   --bg: #060606; --text: #eeeeee; --accent: #f62660;
   --line: rgba(238,238,238,.17); --line-strong: rgba(238,238,238,.35);
   --muted: rgba(238,238,238,.58); --hover: rgba(238,238,238,.065);
-  --ok: #eeeeee;
+  --ok: #34d17a;
   --font: "Mona Sans", "Noto Sans JP", sans-serif;
   font: 11px/1.4 var(--font); font-optical-sizing: auto;
   font-variant-numeric: tabular-nums; font-synthesis: none;
@@ -84,11 +84,11 @@ input:disabled { opacity: .4; }
 .icon-btn { width: 22px; min-width: 22px; padding: 0; border-color: transparent; color: var(--muted); }
 .icon-btn:hover { border-color: transparent; color: var(--text); }
 
-/* Live connection lamp: hollow = offline, white = ready, pink = device not on Master. */
+/* Live connection lamp: hollow = offline, green = ready, pink = device not on Master. */
 .lamp { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 10px; }
 .dot { flex-shrink: 0; width: 7px; height: 7px; border: 1px solid var(--line-strong); border-radius: 50%; }
-.lamp.on { color: var(--text); }
-.lamp.on .dot { background: var(--text); border-color: var(--text); }
+.lamp.on { color: var(--ok); }
+.lamp.on .dot { background: var(--ok); border-color: var(--ok); }
 .lamp.warn { color: var(--accent); }
 .lamp.warn .dot { background: var(--accent); border-color: var(--accent); }
 .conn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; color: var(--muted); font-size: 10px; }
@@ -97,6 +97,14 @@ input:disabled { opacity: .4; }
 .actions { flex-shrink: 0; display: grid; gap: 3px; padding: 4px; }
 .action { width: 100%; height: 30px; }
 .action .material-symbol { font-size: 18px; }
+.pair-row { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.action.small { height: 22px; }
+.action.small .material-symbol { font-size: 14px; }
+/* Waveform (audio) and film frame (video): drawn inline, not in the icon subset. */
+.glyph { width: 16px; height: 16px; margin-right: 2px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+.glyph .fill { fill: currentColor; stroke: none; }
+/* Marker / locator shape (not in the icon subset): a flag with a pointed foot. */
+.marker-glyph { width: 8px; height: 11px; margin-right: 1px; background: currentColor; clip-path: polygon(0 0, 100% 0, 100% 64%, 50% 100%, 0 64%); }
 .primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 .primary:hover { background: var(--text); border-color: var(--text); color: var(--bg); }
 .primary:disabled, .primary:disabled:hover { background: var(--accent); border-color: var(--accent); color: var(--bg); }

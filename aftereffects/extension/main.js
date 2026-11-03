@@ -79,6 +79,9 @@ function setBusy(on) {
   $("busyBar").hidden = !on;
   $("sendBtn").disabled = on;
   $("getBtn").disabled = on;
+  $("sendVideoBtn").disabled = on;
+  $("sendMarkersBtn").disabled = on;
+  $("getMarkersBtn").disabled = on;
 }
 
 // ------------------------------------------------------------------ ExtendScript
@@ -324,6 +327,17 @@ async function sendToLive() {
   status(t("sent", res.result.created.length));
 }
 
+async function sendVideoToLive() {
+  // Check Live first: the render can take a while.
+  if (!connected) throw fail("noLive");
+  const outDir = await resolveOutDir();
+  const name = (await evalHost("PL_getSelection")).comp.name;
+  status(t("renderingVideo", name));
+  const r = await evalHost("PL_renderCompVideo", path.join(outDir, `pl_video_${sanitize(name)}_${Date.now()}.mp4`));
+  await request({ type: "importVideo", path: r.path, positionSec: r.startSec, name });
+  status(t("videoSent", name, r.durationSec.toFixed(1)), false, r.path);
+}
+
 // ------------------------------------------------------------------ Live -> Ae
 
 async function getFromLive() {
@@ -349,6 +363,30 @@ async function importCapture(r, outDir) {
   if (imp.muted) parts.push(t("muted", imp.muted));
   const warnings = [...new Set((r.warnings || []).map((w) => t("warn." + w)))];
   status(parts.concat(warnings).join(" · "), warnings.length > 0, r.path);
+}
+
+// ------------------------------------------------------------------ markers <-> locators
+
+function markerCounts(r) {
+  const parts = [];
+  for (const k of ["created", "renamed", "unchanged", "skipped"]) {
+    if (r[k]) parts.push(t("mk." + k, r[k]));
+  }
+  return parts.join(" · ");
+}
+
+async function sendMarkers() {
+  const ae = await evalHost("PL_getCompMarkers");
+  if (!ae.markers.length) throw fail("noMarkers");
+  const res = await request({ type: "sendMarkers", markers: ae.markers });
+  status(t("markersSent") + " " + markerCounts(res.result));
+}
+
+async function getMarkers() {
+  const res = await request({ type: "getMarkers" });
+  if (!res.result.cues.length) throw fail("noLocators");
+  const r = await evalHost("PL_setCompMarkers", res.result.cues);
+  status(t("markersGot") + " " + markerCounts(r));
 }
 
 // ------------------------------------------------------------------ UI wiring
@@ -392,6 +430,9 @@ $("saveDir").addEventListener("blur", () => {
 });
 $("sendBtn").addEventListener("click", () => run(sendToLive));
 $("getBtn").addEventListener("click", () => run(getFromLive));
+$("sendVideoBtn").addEventListener("click", () => run(sendVideoToLive));
+$("sendMarkersBtn").addEventListener("click", () => run(sendMarkers));
+$("getMarkersBtn").addEventListener("click", () => run(getMarkers));
 
 if (inCEP) connect();
 else status(t("preview"));

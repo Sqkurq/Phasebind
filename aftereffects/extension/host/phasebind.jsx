@@ -6,6 +6,8 @@
 var PL_TAG = "Phasebind:";
 var PL_FOLDER = "Phasebind";
 var PL_WAV_TEMPLATE = "Phasebind WAV";
+var PL_VIDEO_TEMPLATE = "Phasebind H.264";
+var PL_POINT_SEC = 0.5; // clip length the Live device uses for markers without a duration
 
 // ---------------------------------------------------------------- JSON (ExtendScript has none)
 
@@ -192,6 +194,72 @@ function PL_renderLayerAudio(index, outPath) {
   }
 }
 
+// ---------------------------------------------------------------- render the comp as video (work area)
+
+function PL_renderCompVideo(outPath) {
+  var queued = [];
+  try {
+    var comp = PL_activeComp();
+    var start = Math.max(0, comp.workAreaStart);
+    var end = Math.min(comp.duration, comp.workAreaStart + comp.workAreaDuration);
+    if (end <= start) throw PL_fail("outsideComp");
+
+    var rq = app.project.renderQueue;
+    for (var q = 1; q <= rq.numItems; q++) {
+      var it = rq.item(q);
+      if (it.status === RQItemStatus.QUEUED) { queued.push(it); it.render = false; }
+    }
+
+    var item = rq.items.add(comp);
+    item.timeSpanStart = start;
+    item.timeSpanDuration = end - start;
+    var om = item.outputModule(1);
+    PL_configureVideo(om);
+    om.file = new File(outPath);
+    var actualPath = om.file.fsName;
+
+    rq.render();
+    item.remove();
+    PL_requeue(queued);
+
+    var out = new File(actualPath);
+    if (!out.exists || out.length === 0) throw PL_fail("renderFailed");
+    return PL_ok({ path: actualPath, startSec: start, durationSec: end - start, name: comp.name });
+  } catch (e) {
+    PL_requeue(queued);
+    return PL_err(e);
+  }
+}
+
+function PL_requeue(list) {
+  for (var i = 0; i < list.length; i++) {
+    try { list[i].render = true; } catch (e) {}
+  }
+}
+
+// H.264 (.mp4) is what Live decodes on every platform. Order as for audio:
+// our saved template, Ae's bundled H.264 templates, then setSettings.
+function PL_configureVideo(om) {
+  var h264 = /h\.?264/i;
+  try { om.applyTemplate(PL_VIDEO_TEMPLATE); } catch (e) {}
+  if (PL_isFormat(om, h264)) return;
+
+  var templates = [];
+  try { templates = om.templates; } catch (e) {}
+  for (var i = 0; i < templates.length; i++) {
+    if (!h264.test(templates[i])) continue;
+    try { om.applyTemplate(templates[i]); } catch (e) { continue; }
+    if (PL_isFormat(om, h264)) return;
+  }
+
+  try { om.setSettings({ "Format": "H.264" }); } catch (e) {}
+  if (PL_isFormat(om, h264)) {
+    try { om.saveAsTemplate(PL_VIDEO_TEMPLATE); } catch (e) {}
+    return;
+  }
+  throw PL_fail("videoOutput");
+}
+
 function PL_restoreLayers(list) {
   for (var i = 0; i < list.length; i++) {
     try {
@@ -261,6 +329,72 @@ function PL_isFormat(om, pattern) {
     }
   } catch (e) {}
   return false;
+}
+
+// ---------------------------------------------------------------- comp markers <-> Live locators
+
+// Comp time 0 is Live's arrangement time 0, as for audio.
+function PL_getCompMarkers() {
+  try {
+    var comp = PL_activeComp();
+    var mp = comp.markerProperty, out = [];
+    for (var i = 1; i <= mp.numKeys; i++) {
+      var t = mp.keyTime(i);
+      if (t < 0) continue;
+      var mv = mp.keyValue(i);
+      out.push({ timeSec: t, durationSec: mv.duration, name: mv.comment || "" });
+    }
+    return PL_ok({ markers: out });
+  } catch (e) {
+    return PL_err(e);
+  }
+}
+
+// Adds a comp marker per Live locator / marker clip. A marker already on the
+// same frame keeps its other settings and only takes the name. Nothing is
+// deleted. Clips up to PL_POINT_SEC (shorter when the next marker is close)
+// stand for markers without a duration.
+function PL_setCompMarkers(markers) {
+  app.beginUndoGroup("Phasebind");
+  try {
+    var comp = PL_activeComp();
+    var mp = comp.markerProperty, fd = comp.frameDuration;
+    var created = 0, renamed = 0, unchanged = 0, skipped = 0;
+    for (var i = 0; i < markers.length; i++) {
+      var t = Math.round(markers[i].timeSec / fd) * fd;
+      if (t < 0 || t > comp.duration) { skipped++; continue; }
+      var key = mp.numKeys ? mp.nearestKeyIndex(t) : 0;
+      if (key && Math.abs(mp.keyTime(key) - t) < fd / 2) {
+        var old = mp.keyValue(key);
+        if (old.comment === markers[i].name) { unchanged++; continue; }
+        var mv = PL_copyMarker(old);
+        mv.comment = markers[i].name;
+        mp.setValueAtKey(key, mv);
+        renamed++;
+      } else {
+        var nv = new MarkerValue(markers[i].name);
+        var d = markers[i].durationSec || 0;
+        if (markers[i].clip && d > PL_POINT_SEC + 0.001) nv.duration = Math.round(d / fd) * fd;
+        mp.setValueAtTime(t, nv);
+        created++;
+      }
+    }
+    app.endUndoGroup();
+    return PL_ok({ created: created, renamed: renamed, unchanged: unchanged, skipped: skipped });
+  } catch (e) {
+    app.endUndoGroup();
+    return PL_err(e);
+  }
+}
+
+function PL_copyMarker(src) {
+  var mv = new MarkerValue(src.comment, src.chapter, src.url, src.frameTarget, src.cuePointName);
+  mv.duration = src.duration;
+  mv.eventCuePoint = src.eventCuePoint;
+  try { mv.label = src.label; } catch (e) {}
+  try { mv.protectedRegion = src.protectedRegion; } catch (e) {}
+  try { mv.setParameters(src.getParameters()); } catch (e) {}
+  return mv;
 }
 
 // ---------------------------------------------------------------- import from Live

@@ -3,12 +3,13 @@
 // The device sits on the Master track and records the whole mix (post master
 // devices, pre master fader).
 //
-// Inlet 0 : commands from node.script / UI ("init", "captureRequest <json>", "importClips <json>", ...)
+// Inlet 0 : commands from node.script / UI ("init", "captureRequest <json>", "importClips <json>",
+//           "importVideo <json>", "importMarkers <json>", "cues <json>", ...)
 // Inlet 1 : peak level of the master signal (float, linear, every ~50 ms)
 // Outlet 0: sfrecord~ control ("open <path>", 1, 0, "samptype float32")
 // Outlet 1: messages to node.script ("fromjs <json>")
 // Outlet 2: status text for the device UI ("set <text>")
-// Outlet 3: Ae connection label ("set <text>")
+// Outlet 3: Ae connection label ("set <text>", "textcolor r g b a")
 //
 // JSON payloads are passed URI-encoded so spaces/quotes survive Max messaging.
 
@@ -16,7 +17,7 @@ autowatch = 1;
 inlets = 2;
 outlets = 4;
 
-var VERSION = "0.8.1";
+var VERSION = "0.9.3";
 var MIX_LINK_ID = "master";
 
 var song = null;
@@ -83,8 +84,14 @@ function init() {
 
 function setdir(path) { baseDir = String(path); }
 
-// Number of connected Ae panels, sent by the bridge.
-function aeconn(n) { outlet(3, "set", n > 0 ? "● Ae" : "○ Ae"); }
+// Number of connected Ae panels, sent by the bridge. Green when connected,
+// like the lamp in the Ae panel.
+var AE_ON_COLOR = [0.204, 0.820, 0.478, 1];   // #34d17a
+var AE_OFF_COLOR = [0.933, 0.933, 0.933, 0.58];
+function aeconn(n) {
+  outlet(3, "set", n > 0 ? "● Ae" : "○ Ae");
+  outlet(3, ["textcolor"].concat(n > 0 ? AE_ON_COLOR : AE_OFF_COLOR));
+}
 
 function setdefaults(json) { defaultOptions = decode(json); }
 
@@ -216,10 +223,7 @@ function prepareSet(state) {
 }
 
 function restoreSet(state) {
-  // Undo in reverse order; keep going even if one step fails.
-  for (var i = state.restore.length - 1; i >= 0; i--) {
-    try { state.restore[i](); } catch (e) { post("Phasebind restore error: " + e + "\n"); }
-  }
+  restoreSteps(state.restore);
   state.restore = [];
 }
 
@@ -336,6 +340,133 @@ function importClips(json) {
   }
 }
 
+// Rendered comp video -> a new track. Live only shows video for arrangement
+// clips. The track starts muted because the layers' audio usually reaches Live
+// separately; unmute it to hear the comp mix instead.
+function importVideo(json) {
+  var req = decode(json);
+  try {
+    if (!song) init();
+    var tempo = num(song, "tempo");
+    var beats = req.positionSec * tempo / 60;
+    song.call("create_audio_track", -1);
+    var tracks = idList(song, "tracks");
+    var track = byId(tracks[tracks.length - 1]);
+    track.set("name", "PB Video " + req.name);
+    track.call("create_audio_clip", req.path, beats);
+
+    var clips = idList(track, "arrangement_clips");
+    if (!clips.length) throw fail("videoImportFailed");
+    var clip = byId(clips[clips.length - 1]);
+    clip.set("warping", 0);
+    clip.set("name", req.name);
+    track.set("mute", 1);
+
+    status("Video");
+    toNode({ id: req.id, ok: true, result: { positionBeats: beats, tempo: tempo } });
+  } catch (e) {
+    replyError(req.id, e.plCode || "videoImportFailed", String(e.message || e));
+  }
+}
+
+// ------------------------------------------------------------------ markers (Ae <-> Live)
+
+// Ae comp markers become named silent clips on a "PB Markers" track. Locators
+// can't be used: set_or_delete_cue rounds the position to the bar and the LOM
+// cannot move a locator. Live -> Ae reads both locators and those clips.
+var MARKER_TRACK = "PB Markers";
+var POS_EPS = 1e-3; // beats; two clips/locators closer than this share a position
+
+function findTrack(name) {
+  var tracks = idList(song, "tracks");
+  for (var i = 0; i < tracks.length; i++) {
+    var t = byId(tracks[i]);
+    if (str(t, "name") === name) return t;
+  }
+  return null;
+}
+
+function clipAt(track, beats) {
+  var clips = idList(track, "arrangement_clips");
+  for (var i = 0; i < clips.length; i++) {
+    var c = byId(clips[i]);
+    if (Math.abs(num(c, "start_time") - beats) < POS_EPS) return c;
+  }
+  return null;
+}
+
+// Each marker carries the path of a silent WAV as long as the clip should be
+// (written by the bridge). A clip already at the same position is renamed;
+// nothing is deleted.
+function importMarkers(json) {
+  var req = decode(json);
+  try {
+    if (!song) init();
+    var tempo = num(song, "tempo");
+    var track = findTrack(MARKER_TRACK);
+    if (!track) {
+      song.call("create_audio_track", -1);
+      var tracks = idList(song, "tracks");
+      track = byId(tracks[tracks.length - 1]);
+      track.set("name", MARKER_TRACK);
+    }
+    var created = 0, renamed = 0, unchanged = 0;
+    for (var i = 0; i < req.markers.length; i++) {
+      var m = req.markers[i];
+      var beats = m.timeSec * tempo / 60;
+      var clip = clipAt(track, beats);
+      if (clip) {
+        if (str(clip, "name") !== m.name) { clip.set("name", m.name); renamed++; }
+        else unchanged++;
+        continue;
+      }
+      track.call("create_audio_clip", m.path, beats);
+      clip = clipAt(track, beats);
+      if (!clip) throw fail("markerFailed", "no clip at beat " + beats);
+      clip.set("warping", 0);
+      clip.set("name", m.name);
+      created++;
+    }
+    status("Markers " + (created + renamed));
+    toNode({ id: req.id, ok: true, result: { created: created, renamed: renamed, unchanged: unchanged, tempo: tempo } });
+  } catch (e) {
+    replyError(req.id, e.plCode || "markerFailed", String(e.detail || e.message || e));
+  }
+}
+
+// Live locators and "PB Markers" clips -> Ae (seconds, constant tempo).
+function cues(json) {
+  var req = decode(json);
+  try {
+    if (!song) init();
+    var tempo = num(song, "tempo");
+    var toSec = 60 / tempo, out = [];
+    var ids = idList(song, "cue_points");
+    for (var i = 0; i < ids.length; i++) {
+      var c = byId(ids[i]);
+      out.push({ name: str(c, "name"), timeSec: num(c, "time") * toSec, durationSec: 0 });
+    }
+    var track = findTrack(MARKER_TRACK);
+    var clips = track ? idList(track, "arrangement_clips") : [];
+    for (var j = 0; j < clips.length; j++) {
+      var k = byId(clips[j]);
+      var st = num(k, "start_time");
+      out.push({ name: str(k, "name"), timeSec: st * toSec, durationSec: (num(k, "end_time") - st) * toSec, clip: true });
+    }
+    out.sort(function (a, b) { return a.timeSec - b.timeSec; });
+    toNode({ id: req.id, ok: true, result: { cues: out, tempo: tempo } });
+  } catch (e) {
+    replyError(req.id, "liveError", String(e.message || e));
+  }
+}
+
+// Undo in reverse order; keep going even if one step fails.
+function restoreSteps(list) {
+  for (var i = list.length - 1; i >= 0; i--) {
+    try { list[i](); } catch (e) { post("Phasebind restore error: " + e + "\n"); }
+  }
+}
+
 function info(json) {
   var req = decode(json);
   if (!song) init();
@@ -349,8 +480,9 @@ function replyError(id, code, detail) {
   toNode({ id: id, ok: false, code: code, error: detail || code });
 }
 
-function fail(code) {
+function fail(code, detail) {
   var e = new Error(code);
   e.plCode = code;
+  if (detail) e.detail = detail;
   return e;
 }

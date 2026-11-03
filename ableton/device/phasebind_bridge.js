@@ -17,8 +17,9 @@ const PORT = 47820;
 const BASE_DIR = path.join(os.homedir(), "Phasebind");
 const RAW_DIR = path.join(BASE_DIR, "raw");
 const FROM_LIVE_DIR = path.join(BASE_DIR, "from_live");
+const MARKER_DIR = path.join(BASE_DIR, "markers");
 
-for (const d of [BASE_DIR, RAW_DIR, FROM_LIVE_DIR]) fs.mkdirSync(d, { recursive: true });
+for (const d of [BASE_DIR, RAW_DIR, FROM_LIVE_DIR, MARKER_DIR]) fs.mkdirSync(d, { recursive: true });
 
 const clients = new Set();
 const pending = new Map(); // request id -> { socket, type, options }
@@ -81,6 +82,18 @@ function handleRequest(socket, req) {
       pending.set(id, { socket, type: "import" });
       maxAPI.outlet("importClips", encode({ id, files: req.files }));
       break;
+    case "importVideo":
+      pending.set(id, { socket, type: "importVideo" });
+      maxAPI.outlet("importVideo", encode({ id, path: req.path, positionSec: req.positionSec, name: req.name }));
+      break;
+    case "sendMarkers":
+      pending.set(id, { socket, type: "sendMarkers" });
+      maxAPI.outlet("importMarkers", encode({ id, markers: markerClips(req.markers) }));
+      break;
+    case "getMarkers":
+      pending.set(id, { socket, type: "getMarkers" });
+      maxAPI.outlet("cues", encode({ id }));
+      break;
     case "capture": {
       const options = Object.assign({}, req.options, {
         rawPath: toMaxPath(path.join(RAW_DIR, `raw_${Date.now()}.wav`)),
@@ -97,6 +110,32 @@ function handleRequest(socket, req) {
     default:
       send(socket, { id, ok: false, code: "badRequest", error: "unknown request type: " + req.type });
   }
+}
+
+// ------------------------------------------------------------------ marker clips
+
+// Ae markers become silent clips in Live; the WAV length is the clip length.
+// Markers without a duration get POINT_SEC (read back as a point marker), and
+// no clip runs into the next marker, which Live would otherwise cut.
+const POINT_SEC = 0.5;
+const MIN_CLIP_SEC = 0.05;
+const SILENCE_RATE = 48000;
+
+function markerClips(markers) {
+  const sorted = (markers || []).slice().sort((a, b) => a.timeSec - b.timeSec);
+  return sorted.map((m, i) => {
+    let sec = m.durationSec > 0 ? m.durationSec : POINT_SEC;
+    if (i + 1 < sorted.length) sec = Math.min(sec, sorted[i + 1].timeSec - m.timeSec);
+    sec = Math.max(sec, MIN_CLIP_SEC);
+    return { timeSec: m.timeSec, name: m.name || "Marker", path: toMaxPath(silence(sec)) };
+  });
+}
+
+function silence(sec) {
+  const frames = Math.round(sec * SILENCE_RATE);
+  const file = path.join(MARKER_DIR, `silence_${frames}.wav`);
+  if (!fs.existsSync(file)) audio.writeWav(file, SILENCE_RATE, [new Float32Array(frames)], 24);
+  return file;
 }
 
 // ------------------------------------------------------------------ messages from [js]
