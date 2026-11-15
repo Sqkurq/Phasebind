@@ -155,12 +155,15 @@ function PL_renderLayerAudio(index, outPath) {
     if (end <= start) throw PL_fail("outsideComp");
 
     // Only the target layer may be audible; solo would mute it otherwise.
+    // Ae refuses to write solo (even false) on a layer with video and audio
+    // both off, e.g. an audio-only layer once muted here: touch solo only
+    // when it is on, and before audio is switched off.
     for (var i = 1; i <= comp.numLayers; i++) {
       var L = comp.layer(i);
       if (L.hasAudio) {
         restore.push({ layer: L, audio: L.audioEnabled, solo: L.solo });
+        if (L.solo) L.solo = false;
         L.audioEnabled = (i === index);
-        L.solo = false;
       }
     }
 
@@ -264,7 +267,7 @@ function PL_restoreLayers(list) {
   for (var i = 0; i < list.length; i++) {
     try {
       list[i].layer.audioEnabled = list[i].audio;
-      list[i].layer.solo = list[i].solo;
+      if (list[i].layer.solo !== list[i].solo) list[i].layer.solo = list[i].solo;
     } catch (e) {}
   }
 }

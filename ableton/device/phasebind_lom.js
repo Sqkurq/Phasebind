@@ -17,7 +17,7 @@ autowatch = 1;
 inlets = 2;
 outlets = 4;
 
-var VERSION = "0.9.4";
+var VERSION = "0.9.5";
 var MIX_LINK_ID = "master";
 
 var song = null;
